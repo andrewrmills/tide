@@ -58,8 +58,10 @@ function fmtDuration(ms) {
 }
 
 // --------------- LOCAL STORAGE CACHE ---------------------
+const CACHE_VERSION = 2; // bump this to auto-invalidate all cached entries
+
 function cacheKey(date, type) {
-  return `tide_${type}_${date}`;
+  return `tide_v${CACHE_VERSION}_${type}_${date}`;
 }
 
 function cacheGet(key) {
@@ -81,7 +83,14 @@ function cacheSet(key, data) {
 // Generates a plausible 24-h tide curve when no API is available.
 // Uses a mixed semi-diurnal pattern tuned loosely for Christchurch.
 function buildFallbackTides(dateStr) {
-  const base = new Date(`${dateStr}T00:00:00+12:00`).getTime();
+  // Derive NZ midnight as a UTC ms value without hardcoding the DST offset.
+  // UTC midnight on dateStr lands on the same NZ calendar day (NZ is UTC+12/+13),
+  // so we read back the NZ hour-of-day and subtract it to reach NZ midnight.
+  const utcMs = new Date(dateStr + 'T00:00:00Z').getTime();
+  const nzHour = parseInt(
+    new Intl.DateTimeFormat('en-CA', { timeZone: TIMEZONE, hour: '2-digit', hour12: false }).format(new Date(utcMs)), 10
+  );
+  const base = utcMs - nzHour * 3600000;
   const M2 = 12.4206 * 3600 * 1000; // principal lunar semi-diurnal period (ms)
   const S2 = 12.0000 * 3600 * 1000;
   const K1 = 23.9345 * 3600 * 1000;
@@ -132,7 +141,7 @@ async function fetchNIWA(dateStr) {
     lat: LAT,
     long: LON,
     datum: 'MSL',
-    numberOfDays: 1,
+    numberOfDays: 2,
     startDate: dateStr,
     interval: 10,
   });
@@ -204,13 +213,16 @@ async function fetchWorldTides(dateStr) {
 }
 
 function extractExtremes(points) {
-  const extremes = [];
+  // Use >= on the trailing side so flat plateaus in rounded data are handled:
+  // the last equal point before descent counts as the peak.
+  const raw = [];
   for (let i = 1; i < points.length - 1; i++) {
     const p = points[i - 1].height, c = points[i].height, n = points[i + 1].height;
-    if (c > p && c > n) extremes.push({ dt: points[i].dt, height: points[i].height, type: 'High' });
-    if (c < p && c < n) extremes.push({ dt: points[i].dt, height: points[i].height, type: 'Low' });
+    if (c >= p && c > n) raw.push({ dt: points[i].dt, height: c, type: 'High' });
+    if (c <= p && c < n) raw.push({ dt: points[i].dt, height: c, type: 'Low' });
   }
-  return extremes;
+  // Deduplicate: keep only the first of any cluster within 1 hour
+  return raw.filter((e, i) => i === 0 || e.dt - raw[i - 1].dt > 3600000);
 }
 
 // --------------- FETCH TIDES (with fallback chain) -------
@@ -445,7 +457,8 @@ async function loadData(dateStr) {
   let allExtremes = [...tideData.extremes];
   const isToday = dateStr === todayNZString();
   if (isToday) {
-    const tomorrow = fmtYMD(new Date(new Date(`${dateStr}T00:00:00+12:00`).getTime() + 86400000));
+    const td = new Date(dateStr + 'T00:00:00Z'); td.setUTCDate(td.getUTCDate() + 1);
+    const tomorrow = td.toISOString().slice(0, 10);
     try {
       const tmData = await fetchTides(tomorrow);
       allExtremes = allExtremes.concat(tmData.extremes);
@@ -461,8 +474,10 @@ async function loadData(dateStr) {
   const picker = document.getElementById('date-picker');
   const today  = todayNZString();
   picker.value = today;
-  picker.max   = fmtYMD(new Date(new Date(`${today}T00:00:00+12:00`).getTime() + 30 * 86400000));
-  picker.min   = fmtYMD(new Date(new Date(`${today}T00:00:00+12:00`).getTime() - 30 * 86400000));
+  const maxD = new Date(today + 'T00:00:00Z'); maxD.setUTCDate(maxD.getUTCDate() + 30);
+  const minD = new Date(today + 'T00:00:00Z'); minD.setUTCDate(minD.getUTCDate() - 30);
+  picker.max = maxD.toISOString().slice(0, 10);
+  picker.min = minD.toISOString().slice(0, 10);
 
   picker.addEventListener('change', () => {
     if (picker.value) loadData(picker.value);

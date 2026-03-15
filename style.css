@@ -1,0 +1,144 @@
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --bg: #0f172a;
+  --surface: #1e293b;
+  --border: #334155;
+  --text: #e5e7eb;
+  --muted: #94a3b8;
+  --accent: #38bdf8;
+  --high: #f97316;
+  --low: #818cf8;
+  --radius: 12px;
+}
+
+html, body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 16px;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+#app {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 16px 16px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+header h1 {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--accent);
+  text-align: center;
+  letter-spacing: 0.02em;
+  padding: 8px 0 4px;
+}
+
+/* Banner */
+.banner {
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 16px 20px;
+  text-align: center;
+}
+
+#next-tide-text {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--accent);
+  line-height: 1.4;
+}
+
+/* Sun row */
+.sun-row {
+  display: flex;
+  justify-content: space-around;
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  font-size: 0.95rem;
+  color: var(--muted);
+}
+
+.sun-row span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Date picker */
+#date-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 10px 16px;
+}
+
+#date-picker-row label {
+  font-size: 0.9rem;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+#date-picker {
+  flex: 1;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 0.95rem;
+  padding: 8px 10px;
+  outline: none;
+  -webkit-appearance: none;
+  color-scheme: dark;
+}
+
+#date-picker:focus {
+  border-color: var(--accent);
+}
+
+/* Chart */
+#chart-container {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 12px 8px 8px;
+  position: relative;
+}
+
+#tide-chart {
+  width: 100% !important;
+  height: 240px !important;
+}
+
+/* Error */
+#error-message {
+  background: #450a0a;
+  border: 1px solid #f87171;
+  border-radius: var(--radius);
+  color: #fca5a5;
+  padding: 14px 18px;
+  text-align: center;
+  font-size: 0.95rem;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* Current time line pulse */
+@keyframes pulse-line {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}

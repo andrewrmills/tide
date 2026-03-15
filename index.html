@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>New Brighton Tide Chart</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1>New Brighton Tide Chart</h1>
+    </header>
+
+    <div id="next-tide-banner" class="banner">
+      <span id="next-tide-text">Loading tide data…</span>
+    </div>
+
+    <div id="sun-times" class="sun-row">
+      <span id="sunrise-text">Sunrise: —</span>
+      <span id="sunset-text">Sunset: —</span>
+    </div>
+
+    <div id="date-picker-row">
+      <label for="date-picker">Date</label>
+      <input type="date" id="date-picker" />
+    </div>
+
+    <div id="chart-container">
+      <canvas id="tide-chart"></canvas>
+    </div>
+
+    <div id="error-message" class="hidden">
+      Unable to load tide data. Please refresh the page.
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>

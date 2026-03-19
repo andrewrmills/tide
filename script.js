@@ -3,8 +3,8 @@
    ========================================================= */
 
 // --------------- CONFIG -----------------------------------
-const LAT = -43.5321;
-const LON = 172.6362;
+const LAT = -43.5067;
+const LON = 172.7318;
 const TIMEZONE = 'Pacific/Auckland';
 
 // NIWA requires an API key. Set it here if you have one.
@@ -280,7 +280,7 @@ function updateBanner(extremes, dateStr) {
   const timeStr = fmt12(new Date(next.dt));
   const durStr  = fmtDuration(remaining);
 
-  el.textContent = `Next tide: ${next.type} at ${timeStr} (${durStr})`;
+  el.textContent = `${next.type} · ${timeStr} · ${durStr} away`;
 }
 
 // --------------- CHART -----------------------------------
@@ -352,27 +352,68 @@ function buildChart(points, extremes, dateStr) {
       c.beginPath();
       c.moveTo(x, top);
       c.lineTo(x, bottom);
-      c.strokeStyle = '#facc15';
-      c.lineWidth = 2;
+      c.strokeStyle = '#f5c94e';
+      c.lineWidth = 1.5;
+      c.shadowColor = 'rgba(245, 201, 78, 0.45)';
+      c.shadowBlur = 6;
       c.setLineDash([6, 4]);
       c.stroke();
       c.restore();
     },
   };
 
+  // Custom plugin: dots at high/low tide extremes
+  const extremeMarkersPlugin = {
+    id: 'extremeMarkers',
+    afterDraw(chart) {
+      const { ctx: c, scales } = chart;
+      const { left, right } = scales.x;
+      const width = right - left;
+
+      extremes
+        .filter(e => e.dt >= dayStart && e.dt <= dayEnd)
+        .forEach(e => {
+          const fraction = (e.dt - dayStart) / (dayEnd - dayStart);
+          const x = left + fraction * width;
+          const y = scales.y.getPixelForValue(e.height);
+
+          c.save();
+          c.beginPath();
+          c.arc(x, y, 4, 0, Math.PI * 2);
+          c.fillStyle = e.type === 'High' ? '#e8974a' : '#5b9fd4';
+          c.shadowColor = e.type === 'High' ? 'rgba(232, 151, 74, 0.5)' : 'rgba(91, 159, 212, 0.5)';
+          c.shadowBlur = 6;
+          c.fill();
+          c.strokeStyle = 'rgba(9, 21, 37, 0.8)';
+          c.shadowBlur = 0;
+          c.lineWidth = 1.5;
+          c.stroke();
+          c.restore();
+        });
+    },
+  };
+
   chartInstance = new Chart(ctx, {
     type: 'line',
-    plugins: [nowLinePlugin],
+    plugins: [nowLinePlugin, extremeMarkersPlugin],
     data: {
       labels,
       datasets: [
         {
           label: 'Tide height (m)',
           data: heights,
-          borderColor: '#38bdf8',
+          borderColor: '#45b8cc',
           borderWidth: 2,
-          backgroundColor: 'transparent',
-          fill: false,
+          backgroundColor: function(context) {
+            const chart = context.chart;
+            const { ctx: c, chartArea } = chart;
+            if (!chartArea) return 'transparent';
+            const gradient = c.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+            gradient.addColorStop(0, 'rgba(69, 184, 204, 0.18)');
+            gradient.addColorStop(1, 'rgba(69, 184, 204, 0)');
+            return gradient;
+          },
+          fill: true,
           tension: 0.4,
           pointRadius: 0,
           pointHoverRadius: 4,
@@ -382,41 +423,44 @@ function buildChart(points, extremes, dateStr) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      animation: { duration: 400 },
+      animation: { duration: 500 },
       interaction: { mode: 'index', intersect: false },
       scales: {
         x: {
           ticks: {
-            color: '#94a3b8',
+            color: '#6b8fb0',
             maxTicksLimit: 7,
-            font: { size: 11 },
+            font: { size: 11, family: 'Outfit' },
           },
-          grid: { color: 'rgba(255,255,255,0.06)' },
+          grid: { color: 'rgba(255,255,255,0.04)' },
         },
         y: {
           suggestedMin: -0.5,
           ticks: {
-            color: '#94a3b8',
-            font: { size: 11 },
+            color: '#6b8fb0',
+            font: { size: 11, family: 'Outfit' },
             callback: v => `${v.toFixed(1)}m`,
           },
-          grid: { color: 'rgba(255,255,255,0.06)' },
+          grid: { color: 'rgba(255,255,255,0.04)' },
         },
       },
       plugins: {
         legend: {
           labels: {
-            color: '#94a3b8',
-            font: { size: 12 },
-            boxWidth: 12,
+            color: '#6b8fb0',
+            font: { size: 12, family: 'Outfit' },
+            boxWidth: 10,
+            boxHeight: 10,
           },
         },
         tooltip: {
-          backgroundColor: '#1e293b',
-          titleColor: '#e5e7eb',
-          bodyColor: '#94a3b8',
-          borderColor: '#334155',
+          backgroundColor: '#0f1f38',
+          titleColor: '#dce8f4',
+          bodyColor: '#6b8fb0',
+          borderColor: '#1e3352',
           borderWidth: 1,
+          cornerRadius: 8,
+          padding: 10,
           callbacks: {
             label: ctx => ` ${ctx.parsed.y.toFixed(2)} m`,
           },
@@ -430,8 +474,8 @@ function buildChart(points, extremes, dateStr) {
 async function loadData(dateStr) {
   document.getElementById('error-message').classList.add('hidden');
   document.getElementById('next-tide-text').textContent = 'Loading…';
-  document.getElementById('sunrise-text').textContent = 'Sunrise: —';
-  document.getElementById('sunset-text').textContent  = 'Sunset: —';
+  document.getElementById('sunrise-text').textContent = '—';
+  document.getElementById('sunset-text').textContent  = '—';
 
   let tideData, sunData;
 
@@ -442,15 +486,15 @@ async function loadData(dateStr) {
     ]);
   } catch (err) {
     document.getElementById('error-message').classList.remove('hidden');
-    document.getElementById('next-tide-text').textContent = 'Error loading data.';
+    document.getElementById('next-tide-text').textContent = 'Failed to load.';
     console.error(err);
     return;
   }
 
   // Sunrise / Sunset
   if (sunData) {
-    document.getElementById('sunrise-text').textContent = `Sunrise: ${fmt12(new Date(sunData.sunrise))}`;
-    document.getElementById('sunset-text').textContent  = `Sunset: ${fmt12(new Date(sunData.sunset))}`;
+    document.getElementById('sunrise-text').textContent = fmt12(new Date(sunData.sunrise));
+    document.getElementById('sunset-text').textContent  = fmt12(new Date(sunData.sunset));
   }
 
   // If today, also load tomorrow extremes for "next tide" when today's are past

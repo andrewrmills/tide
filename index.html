@@ -14,13 +14,18 @@
 <body>
   <main id="app">
     <header>
-      <h1>New Brighton</h1>
-      <p class="subtitle">Tide Chart · Christchurch, NZ</p>
+      <h1>Tide Chart</h1>
+      <p class="subtitle">New Brighton · Christchurch, NZ</p>
     </header>
 
     <div id="next-tide-banner" class="banner">
       <span class="banner-eyebrow">Next tide</span>
       <span id="next-tide-text">Loading…</span>
+    </div>
+
+    <div id="date-picker-row">
+      <label for="date-picker">Date</label>
+      <input type="date" id="date-picker" />
     </div>
 
     <div id="sun-times" class="sun-row">
@@ -59,10 +64,36 @@
       </div>
     </div>
 
-    <div id="date-picker-row">
-      <label for="date-picker">Date</label>
-      <input type="date" id="date-picker" />
+    <div id="wind-row" class="wind-row">
+      <div class="wind-item">
+        <svg id="wind-arrow-icon" class="wind-arrow" width="16" height="16"
+             viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+             aria-hidden="true">
+          <line x1="12" y1="19" x2="12" y2="5"/>
+          <polyline points="5 12 12 5 19 12"/>
+        </svg>
+        <div class="sun-info">
+          <span class="sun-label">Wind</span>
+          <span id="wind-speed-text" class="sun-time">—</span>
+        </div>
+      </div>
+      <div class="sun-divider"></div>
+      <div class="wind-item">
+        <div class="sun-info">
+          <span class="sun-label">Gusts</span>
+          <span id="wind-gust-text" class="sun-time">—</span>
+        </div>
+      </div>
+      <div class="sun-divider"></div>
+      <div class="wind-item">
+        <div class="sun-info">
+          <span class="sun-label">Direction</span>
+          <span id="wind-dir-text" class="sun-time">—</span>
+        </div>
+      </div>
     </div>
+    <p id="wind-disclaimer" class="wind-disclaimer hidden"></p>
 
     <div id="chart-container">
       <canvas id="tide-chart"></canvas>

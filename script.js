@@ -64,13 +64,12 @@ function cacheKey(date, type) {
   return `tide_v${CACHE_VERSION}_${type}_${date}`;
 }
 
-function cacheGet(key) {
+function cacheGet(key, ttlMs = 6 * 3600 * 1000) {
   try {
     const raw = localStorage.getItem(key);
     if (!raw) return null;
     const { ts, data } = JSON.parse(raw);
-    // expire after 6 hours
-    if (Date.now() - ts > 6 * 3600 * 1000) { localStorage.removeItem(key); return null; }
+    if (Date.now() - ts > ttlMs) { localStorage.removeItem(key); return null; }
     return data;
   } catch { return null; }
 }
@@ -256,6 +255,100 @@ async function fetchSun(dateStr) {
   }
 }
 
+// --------------- WIND FETCH (Open-Meteo) -----------------
+async function fetchWind() {
+  const today = todayNZString();
+  const ck = cacheKey(today, 'wind');
+  const cached = cacheGet(ck, 30 * 60 * 1000); // 30-minute TTL for wind
+  if (cached) return cached;
+
+  const params = new URLSearchParams({
+    latitude: LAT,
+    longitude: LON,
+    hourly: 'windspeed_10m,winddirection_10m,windgusts_10m',
+    windspeed_unit: 'kmh',
+    timezone: TIMEZONE,
+    forecast_days: 16,
+    past_days: 5,
+  });
+
+  try {
+    const res = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`);
+    if (!res.ok) throw new Error(`Wind API ${res.status}`);
+    const json = await res.json();
+
+    const times  = json.hourly.time;
+    const speeds = json.hourly.windspeed_10m;
+    const dirs   = json.hourly.winddirection_10m;
+    const gusts  = json.hourly.windgusts_10m;
+
+    // Build map: "YYYY-MM-DD" → [{hour, speed, dir, gust}, ...]
+    const byDate = {};
+    times.forEach((t, i) => {
+      const dateStr = t.slice(0, 10);
+      const hour    = parseInt(t.slice(11, 13), 10);
+      if (!byDate[dateStr]) byDate[dateStr] = [];
+      byDate[dateStr].push({ hour, speed: speeds[i], dir: dirs[i], gust: gusts[i] });
+    });
+
+    cacheSet(ck, byDate);
+    return byDate;
+  } catch (err) {
+    console.warn('Wind fetch failed:', err);
+    return null;
+  }
+}
+
+function degToCompass(deg) {
+  const dirs = ['N','NNE','NE','ENE','E','ESE','SE','SSE',
+                 'S','SSW','SW','WSW','W','WNW','NW','NNW'];
+  return dirs[Math.round(deg / 22.5) % 16];
+}
+
+function updateWind(windByDate, dateStr) {
+  const speedEl      = document.getElementById('wind-speed-text');
+  const gustEl       = document.getElementById('wind-gust-text');
+  const dirEl        = document.getElementById('wind-dir-text');
+  const arrow        = document.getElementById('wind-arrow-icon');
+  const disclaimerEl = document.getElementById('wind-disclaimer');
+
+  const dayData = windByDate && windByDate[dateStr];
+  if (!dayData || !dayData.length) {
+    disclaimerEl.classList.add('hidden');
+    return; // leave DOM at '—' default
+  }
+
+  // Today: pick closest to current NZ hour. Other dates: pick noon (12).
+  const isToday = dateStr === todayNZString();
+  let targetHour = 12;
+  if (isToday) {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: TIMEZONE, hour: '2-digit', hour12: false,
+    }).formatToParts(new Date());
+    targetHour = parseInt(parts.find(p => p.type === 'hour').value, 10);
+  }
+
+  const record = dayData.reduce((best, r) =>
+    Math.abs(r.hour - targetHour) < Math.abs(best.hour - targetHour) ? r : best
+  );
+
+  speedEl.textContent = `${Math.round(record.speed)} km/h`;
+  gustEl.textContent  = `${Math.round(record.gust)} km/h`;
+  dirEl.textContent   = degToCompass(record.dir);
+  // Arrow points in the direction the wind is blowing TO (add 180° to meteorological direction)
+  arrow.style.transform = `rotate(${(record.dir + 180) % 360}deg)`;
+
+  // Show forecast time disclaimer for non-today dates
+  if (isToday) {
+    disclaimerEl.classList.add('hidden');
+  } else {
+    const period = record.hour < 12 ? 'AM' : 'PM';
+    const h = record.hour % 12 === 0 ? 12 : record.hour % 12;
+    disclaimerEl.textContent = `Forecast for ${h}:00 ${period}`;
+    disclaimerEl.classList.remove('hidden');
+  }
+}
+
 // --------------- NEXT TIDE BANNER ------------------------
 function updateBanner(extremes, dateStr) {
   const el = document.getElementById('next-tide-text');
@@ -285,6 +378,9 @@ function updateBanner(extremes, dateStr) {
 
 // --------------- CHART -----------------------------------
 let chartInstance = null;
+let bannerExtremes = [];
+let bannerDateStr = '';
+let bannerInterval = null;
 
 function buildChart(points, extremes, dateStr) {
   const ctx = document.getElementById('tide-chart').getContext('2d');
@@ -476,13 +572,17 @@ async function loadData(dateStr) {
   document.getElementById('next-tide-text').textContent = 'Loading…';
   document.getElementById('sunrise-text').textContent = '—';
   document.getElementById('sunset-text').textContent  = '—';
+  document.getElementById('wind-speed-text').textContent = '—';
+  document.getElementById('wind-gust-text').textContent  = '—';
+  document.getElementById('wind-dir-text').textContent   = '—';
 
-  let tideData, sunData;
+  let tideData, sunData, windByDate;
 
   try {
-    [tideData, sunData] = await Promise.all([
+    [tideData, sunData, windByDate] = await Promise.all([
       fetchTides(dateStr),
       fetchSun(dateStr),
+      fetchWind(),
     ]);
   } catch (err) {
     document.getElementById('error-message').classList.remove('hidden');
@@ -509,7 +609,14 @@ async function loadData(dateStr) {
     } catch {}
   }
 
+  // Store for real-time banner updates
+  bannerExtremes = allExtremes;
+  bannerDateStr  = dateStr;
+  if (bannerInterval) clearInterval(bannerInterval);
+  bannerInterval = setInterval(() => updateBanner(bannerExtremes, bannerDateStr), 60 * 1000);
+
   updateBanner(allExtremes, dateStr);
+  updateWind(windByDate, dateStr);
   buildChart(tideData.points, tideData.extremes, dateStr);
 }
 

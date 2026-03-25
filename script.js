@@ -18,6 +18,17 @@ const NIWA_API_KEY = 'X0jzuUyYmlXnxgCisufPDXa1aQNFGxAo';
 const WORLDTIDES_API_KEY = '';
 
 // --------------- HELPERS ----------------------------------
+
+// Returns the UTC timestamp (ms) for NZ midnight on dateStr, correctly
+// handling DST (NZST UTC+12 vs NZDT UTC+13) rather than hardcoding +12:00.
+function nzMidnightMs(dateStr) {
+  const utcMs = new Date(dateStr + 'T00:00:00Z').getTime();
+  const nzHour = parseInt(
+    new Intl.DateTimeFormat('en-CA', { timeZone: TIMEZONE, hour: '2-digit', hour12: false }).format(new Date(utcMs)), 10
+  );
+  return utcMs - nzHour * 3600000;
+}
+
 function toNZDate(isoOrDate) {
   const d = typeof isoOrDate === 'string' ? new Date(isoOrDate) : isoOrDate;
   return new Date(d.toLocaleString('en-NZ', { timeZone: TIMEZONE }));
@@ -82,14 +93,7 @@ function cacheSet(key, data) {
 // Generates a plausible 24-h tide curve when no API is available.
 // Uses a mixed semi-diurnal pattern tuned loosely for Christchurch.
 function buildFallbackTides(dateStr) {
-  // Derive NZ midnight as a UTC ms value without hardcoding the DST offset.
-  // UTC midnight on dateStr lands on the same NZ calendar day (NZ is UTC+12/+13),
-  // so we read back the NZ hour-of-day and subtract it to reach NZ midnight.
-  const utcMs = new Date(dateStr + 'T00:00:00Z').getTime();
-  const nzHour = parseInt(
-    new Intl.DateTimeFormat('en-CA', { timeZone: TIMEZONE, hour: '2-digit', hour12: false }).format(new Date(utcMs)), 10
-  );
-  const base = utcMs - nzHour * 3600000;
+  const base = nzMidnightMs(dateStr);
   const M2 = 12.4206 * 3600 * 1000; // principal lunar semi-diurnal period (ms)
   const S2 = 12.0000 * 3600 * 1000;
   const K1 = 23.9345 * 3600 * 1000;
@@ -184,7 +188,7 @@ async function fetchWorldTides(dateStr) {
   const cached = cacheGet(ck);
   if (cached) return cached;
 
-  const startEpoch = Math.floor(new Date(`${dateStr}T00:00:00+12:00`).getTime() / 1000);
+  const startEpoch = Math.floor(nzMidnightMs(dateStr) / 1000);
   const endEpoch   = startEpoch + 86400 + 3600;
 
   const base = `https://www.worldtides.info/api/v3?heights&extremes`
@@ -355,7 +359,7 @@ function updateBanner(extremes, dateStr) {
   const now = Date.now();
 
   // Filter extremes on the selected date
-  const dayStart = new Date(`${dateStr}T00:00:00+12:00`).getTime();
+  const dayStart = nzMidnightMs(dateStr);
   const dayEnd   = dayStart + 86400000;
 
   // Combine with tomorrow's extremes if available (already fetched)
@@ -391,7 +395,7 @@ function buildChart(points, extremes, dateStr) {
   }
 
   // Limit points to the selected date in NZ time
-  const dayStart = new Date(`${dateStr}T00:00:00+12:00`).getTime();
+  const dayStart = nzMidnightMs(dateStr);
   const dayEnd   = dayStart + 86400000;
 
   const filtered = points.filter(p => p.dt >= dayStart && p.dt <= dayEnd);

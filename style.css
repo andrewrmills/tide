@@ -242,6 +242,26 @@ header h1 {
   animation: fade-up 0.45s ease 0.13s both;
 }
 
+#today-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--accent);
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  padding: 4px 10px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+#today-btn:active {
+  background: var(--accent-glow);
+  border-color: var(--accent);
+}
+
 #date-picker-row:focus-within {
   border-color: rgba(69, 184, 204, 0.4);
 }
@@ -264,7 +284,6 @@ header h1 {
   font-size: 0.95rem;
   font-weight: 500;
   outline: none;
-  -webkit-appearance: none;
   color-scheme: dark;
   cursor: pointer;
   font-variant-numeric: tabular-nums;

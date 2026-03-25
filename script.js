@@ -630,8 +630,20 @@ async function loadData(dateStr) {
   picker.max = maxD.toISOString().slice(0, 10);
   picker.min = minD.toISOString().slice(0, 10);
 
+  const todayBtn = document.getElementById('today-btn');
+
   picker.addEventListener('change', () => {
-    if (picker.value) loadData(picker.value);
+    if (picker.value) {
+      todayBtn.classList.toggle('hidden', picker.value === todayNZString());
+      loadData(picker.value);
+    }
+  });
+
+  todayBtn.addEventListener('click', () => {
+    const t = todayNZString();
+    picker.value = t;
+    todayBtn.classList.add('hidden');
+    loadData(t);
   });
 
   loadData(today);

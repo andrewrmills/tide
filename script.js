@@ -69,7 +69,7 @@ function fmtDuration(ms) {
 }
 
 // --------------- LOCAL STORAGE CACHE ---------------------
-const CACHE_VERSION = 2; // bump this to auto-invalidate all cached entries
+const CACHE_VERSION = 3; // bump this to auto-invalidate all cached entries
 
 function cacheKey(date, type) {
   return `tide_v${CACHE_VERSION}_${type}_${date}`;
@@ -221,8 +221,8 @@ function extractExtremes(points) {
   const raw = [];
   for (let i = 1; i < points.length - 1; i++) {
     const p = points[i - 1].height, c = points[i].height, n = points[i + 1].height;
-    if (c >= p && c > n) raw.push({ dt: points[i].dt, height: c, type: 'High' });
-    if (c <= p && c < n) raw.push({ dt: points[i].dt, height: c, type: 'Low' });
+    if (c > p && c > n) raw.push({ dt: points[i].dt, height: c, type: 'High' });
+    if (c < p && c < n) raw.push({ dt: points[i].dt, height: c, type: 'Low' });
   }
   // Deduplicate: keep only the first of any cluster within 1 hour
   return raw.filter((e, i) => i === 0 || e.dt - raw[i - 1].dt > 3600000);
@@ -385,6 +385,8 @@ let chartInstance = null;
 let bannerExtremes = [];
 let bannerDateStr = '';
 let bannerInterval = null;
+let windByDateCache = null;
+let windInterval = null;
 
 function buildChart(points, extremes, dateStr) {
   const ctx = document.getElementById('tide-chart').getContext('2d');
@@ -620,7 +622,12 @@ async function loadData(dateStr) {
   bannerInterval = setInterval(() => updateBanner(bannerExtremes, bannerDateStr), 60 * 1000);
 
   updateBanner(allExtremes, dateStr);
+
+  windByDateCache = windByDate;
+  if (windInterval) clearInterval(windInterval);
+  windInterval = setInterval(() => updateWind(windByDateCache, bannerDateStr), 60 * 1000);
   updateWind(windByDate, dateStr);
+
   buildChart(tideData.points, tideData.extremes, dateStr);
 }
 
